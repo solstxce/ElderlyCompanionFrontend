@@ -6,13 +6,27 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { ChevronRight, MessageCircle, Bell, Calendar, Heart, Star, X } from "lucide-react"
 import { Line, LineChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart"
 
 interface Message {
   role: 'user' | 'companion'
   content: string
+}
+
+interface Medication {
+  name: string
+  dosage: string
+  instructions: string
+}
+
+interface MedicationSchedule {
+  [key: string]: {
+    medications: Medication[]
+    time_range: number[]
+  }
 }
 
 const usageData = [
@@ -34,6 +48,10 @@ export function ImprovedLandingPageComponent() {
     medicationReminders: 0,
     conversationsHandled: 0
   })
+  const [medicationSchedule, setMedicationSchedule] = useState<MedicationSchedule | null>(null)
+  const [showMedicationModal, setShowMedicationModal] = useState(false)
+  const [currentPeriod, setCurrentPeriod] = useState('')
+  const [showReminderButton, setShowReminderButton] = useState(true)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -61,6 +79,19 @@ export function ImprovedLandingPageComponent() {
     setMessages(newMessages)
     setInput('')
 
+    const lowerInput = input.toLowerCase()
+    if (['morning', 'afternoon', 'evening'].includes(lowerInput)) {
+      try {
+        const response = await fetch('http://localhost:5000/medication_schedule')
+        const data = await response.json()
+        setMedicationSchedule(data.schedule)
+        setCurrentPeriod(lowerInput)
+        setShowMedicationModal(true)
+      } catch (error) {
+        console.error('Error fetching medication schedule:', error)
+      }
+    }
+
     try {
       const response = await fetch('http://localhost:5000/chat', {
         method: 'POST',
@@ -82,6 +113,11 @@ export function ImprovedLandingPageComponent() {
       const response = await fetch('http://localhost:5000/remind')
       const data = await response.json()
       setReminder(data.reminder)
+      setShowReminderButton(false)
+      setTimeout(() => {
+        setReminder('')
+        setShowReminderButton(true)
+      }, 5000)
     } catch (error) {
       console.error('Error getting reminder:', error)
       setReminder('Unable to fetch reminder at this time.')
@@ -118,7 +154,7 @@ export function ImprovedLandingPageComponent() {
               Our AI-powered app provides 24/7 support, medication reminders, and friendly conversation for seniors.
             </p>
             <Button size="lg" className="mr-4">
-              Start Free Trial
+              Start for Free Now!
               <ChevronRight className="ml-2 h-4 w-4" />
             </Button>
             <Button variant="outline" size="lg">
@@ -132,7 +168,7 @@ export function ImprovedLandingPageComponent() {
             transition={{ duration: 0.5, delay: 0.2 }}
           >
             <img
-              src="https://img.freepik.com/premium-vector/online-medical-service-concept-illustration-healthcare-websites-apps_1324816-35548.jpg"
+              src="https://img.freepik.com/premium-vector/online-medical-service-concept-illustration-healthcare-websites-apps_347450522.jpg"
               alt="Elderly person using a tablet with caregiver"
               className="rounded-lg shadow-lg w-full h-auto"
             />
@@ -193,7 +229,7 @@ export function ImprovedLandingPageComponent() {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="month" />
                       <YAxis />
-                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Tooltip content={<ChartTooltipContent />} />
                       <Legend />
                       <Line type="monotone" dataKey="users" stroke="var(--color-users)" strokeWidth={2} />
                     </LineChart>
@@ -290,7 +326,7 @@ export function ImprovedLandingPageComponent() {
               </ul>
             </div>
             <div>
-              <h4 className="text-xl font-semibold mb-4">Stay Connected</h4>
+              <h4 className="text-xl font-semibold mb-4">Stay  Connected</h4>
               <p className="mb-4">Subscribe to our newsletter for updates and tips.</p>
               <form className="flex">
                 <Input type="email" placeholder="Enter your email" className="mr-2" />
@@ -299,14 +335,14 @@ export function ImprovedLandingPageComponent() {
             </div>
           </div>
           <div className="mt-8 text-center">
-            <p>&copy; 2023 ElderlyCompanion. All rights reserved.</p>
+            <p>&copy; 2024 ElderlyCompanion. All rights reserved.</p>
           </div>
         </div>
       </footer>
 
       {/* Chatbot Toggle Button */}
       <motion.button
-        className="fixed bottom-4 right-4 w-16 h-16 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center"
+        className="fixed bottom-4 right-4 w-16 h-16 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center z-50"
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.9 }}
         onClick={() => setChatOpen(!chatOpen)}
@@ -320,10 +356,9 @@ export function ImprovedLandingPageComponent() {
           <motion.div
             initial={{ opacity: 0, y: 50, scale: 0.3 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            
             exit={{ opacity: 0, y: 50, scale: 0.3 }}
             transition={{ duration: 0.3 }}
-            className="fixed bottom-24 right-4 w-96 bg-white dark:bg-gray-800 rounded-lg shadow-xl overflow-hidden"
+            className="fixed bottom-24 right-4 w-96 bg-white dark:bg-gray-800 rounded-lg shadow-xl overflow-hidden z-40"
           >
             <Card className="border-none">
               <CardHeader>
@@ -356,9 +391,11 @@ export function ImprovedLandingPageComponent() {
                   />
                   <Button onClick={handleSendMessage}>Send</Button>
                 </div>
-                <Button onClick={handleGetReminder} className="w-full mb-4">
-                  <Bell className="mr-2 h-4 w-4" /> Get Medication Reminder
-                </Button>
+                {showReminderButton && (
+                  <Button onClick={handleGetReminder} className="w-full mb-4">
+                    <Bell className="mr-2 h-4 w-4" /> Get Medication Reminder
+                  </Button>
+                )}
                 {reminder && (
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
@@ -376,6 +413,31 @@ export function ImprovedLandingPageComponent() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Medication Schedule Modal */}
+      <Dialog open={showMedicationModal} onOpenChange={setShowMedicationModal}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Medication Schedule for {currentPeriod}</DialogTitle>
+          </DialogHeader>
+          <DialogDescription>
+            {medicationSchedule && medicationSchedule[currentPeriod] && (
+              <div>
+                <p>Time Range: {medicationSchedule[currentPeriod].time_range[0]}:00 - {medicationSchedule[currentPeriod].time_range[1]}:00</p>
+                <ul className="list-disc pl-5 mt-2">
+                  {medicationSchedule[currentPeriod].medications.map((med, index) => (
+                    <li key={index} className="mb-2">
+                      <strong>{med.name}</strong> - {med.dosage}
+                      <br />
+                      <span className="text-sm text-gray-600">{med.instructions}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </DialogDescription>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
